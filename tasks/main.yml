@@ -5,22 +5,19 @@
   register: user_home
   changed_when: false
 
-- name: Append configurations to .bashrc for specific user
+- name: Update .bashrc for specific user
   blockinfile:
     path: "{{ user_home.stdout }}/.bashrc"
     block: |
-      # kubectl
+      # kubectl configurations
       source <(kubectl completion bash)
       alias k=kubectl
       complete -F __start_kubectl k
-
-      # kubectl krew
-      export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
-
-      # Additional bashrc configurations for installed packages
-      complete -C /usr/bin/terraform terraform
-      complete -C /usr/bin/packer packer
-      export PATH=$PATH:$HOME/.pulumi/bin
+      
+      # kubectl krew configurations
+      if [ -d "${KREW_ROOT:-$HOME/.krew}/bin" ]; then
+        export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
+      fi
   become: no
   notify:
     - reload bashrc
@@ -100,22 +97,27 @@
     - name: Download and Install krew
       shell: |
         (
-          set -x; cd "$(mktemp -d)" &&
-          OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
-          ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')" &&
-          KREW="krew-${OS}_${ARCH}" &&
-          curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" &&
-          tar zxvf "${KREW}.tar.gz" &&
-          ./"${KREW}" install krew
+          set -e;
+          if ! kubectl krew version; then
+            cd "$(mktemp -d)" &&
+            OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
+            ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')" &&
+            KREW="krew-${OS}_${ARCH}" &&
+            curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" &&
+            tar zxvf "${KREW}.tar.gz" &&
+            ./"${KREW}" install krew
+          fi
         )
       args:
         executable: /bin/bash
       environment:
         KREW_ROOT: "{{ user_home.stdout }}/.krew"
+        PATH: "{{ ansible_env.PATH }}:{{ user_home.stdout }}/.krew/bin"
       become: no
       register: krew_install_result
       changed_when: "'Added krew' in krew_install_result.stdout"
   when: krew_check.rc != 0
+
 
 # install krew_plugins
 - name: Check if krew plugin is already installed

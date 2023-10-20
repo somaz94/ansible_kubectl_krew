@@ -24,7 +24,7 @@
       when: ansible_os_family == 'RedHat'
 
   roles:
-    - role: ansible-kubectl-krew
+    - role: ansible_kubectl_krew
 
   post_tasks:
     - name: Notify about .bashrc reload

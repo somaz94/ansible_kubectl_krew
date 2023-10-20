@@ -1,5 +1,5 @@
 ---
-# vars file for ansible-kubectl-krew
+# vars file for ansible_kubectl_krew
 home_user: "somaz"
 krew_version: "v0.4.4"
 krew_plugins:
