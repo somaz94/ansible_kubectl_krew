@@ -1,0 +1,162 @@
+---
+# setup_bashrc
+- name: Get home directory of specific user
+  shell: "eval echo ~{{ home_user }}"
+  register: user_home
+  changed_when: false
+
+- name: Append configurations to .bashrc for specific user
+  blockinfile:
+    path: "{{ user_home.stdout }}/.bashrc"
+    block: |
+      # kubectl
+      source <(kubectl completion bash)
+      alias k=kubectl
+      complete -F __start_kubectl k
+
+      # kubectl krew
+      export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
+
+      # Additional bashrc configurations for installed packages
+      complete -C /usr/bin/terraform terraform
+      complete -C /usr/bin/packer packer
+      export PATH=$PATH:$HOME/.pulumi/bin
+  become: no
+  notify:
+    - reload bashrc
+
+# install kubectl
+- name: Check if kubectl is installed
+  command: kubectl version --client
+  register: kubectl_check
+  failed_when: false
+  changed_when: false
+
+- name: Set kubectl_installed fact based on kubectl_check
+  set_fact:
+    kubectl_installed: "{{ kubectl_check.rc == 0 }}"
+
+- name: Get installed kubectl version
+  command: kubectl version --client -short | awk '/Client/ {print $3}'
+  register: installed_kubectl_version
+  failed_when: false
+  changed_when: false
+  when: kubectl_installed
+
+- set_fact:
+    installed_kubectl_version: "{{ installed_kubectl_version.stdout.split('\n')[0].split(': ')[1] }}"
+  when: kubectl_installed
+
+- name: Add required tools (Debian/Ubuntu)
+  shell: |
+    apt-get update && sudo apt-get install -y gnupg software-properties-common wget curl git
+  when: ansible_os_family == 'Debian'
+  become: yes
+
+- name: Retrieve the latest kubectl version
+  command:
+    cmd: "curl -L -s https://dl.k8s.io/release/stable.txt"
+  register: latest_kubectl_version
+  changed_when: false
+
+- name: Install kubectl using binary 
+  block:
+    - name: Download kubectl binary
+      get_url:
+        url: "https://dl.k8s.io/release/{{ latest_kubectl_version.stdout }}/bin/linux/amd64/kubectl"
+        dest: "/tmp/kubectl"
+        mode: '0755'
+        force: no
+      when: not kubectl_installed or (installed_kubectl_version.stdout is defined and installed_kubectl_version.stdout != latest_kubectl_version.stdout)
+
+    - name: Install kubectl
+      command:
+        cmd: "sudo install -o root -g root -m 0755 /tmp/kubectl /usr/local/bin/kubectl"
+      become: yes
+      when: not kubectl_installed or (installed_kubectl_version.stdout is defined and installed_kubectl_version.stdout != latest_kubectl_version.stdout)
+
+    - name: Clean up the downloaded binary
+      file:
+        path: "/tmp/kubectl"
+        state: absent
+      when: not kubectl_installed or (installed_kubectl_version.stdout is defined and installed_kubectl_version.stdout != latest_kubectl_version.stdout)
+
+# install krew
+- name: Check if krew is installed
+  shell: kubectl krew version
+  register: krew_check
+  failed_when: false
+  changed_when: false
+
+- name: Ensure git is installed RHEL/CentOS
+  yum:
+    name: git
+    state: present
+  become: yes
+  when: ansible_os_family == 'RedHat'
+
+- name: Install krew
+  block:
+    - name: Download and Install krew
+      shell: |
+        (
+          set -x; cd "$(mktemp -d)" &&
+          OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
+          ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')" &&
+          KREW="krew-${OS}_${ARCH}" &&
+          curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" &&
+          tar zxvf "${KREW}.tar.gz" &&
+          ./"${KREW}" install krew
+        )
+      args:
+        executable: /bin/bash
+      environment:
+        KREW_ROOT: "{{ user_home.stdout }}/.krew"
+      become: no
+      register: krew_install_result
+      changed_when: "'Added krew' in krew_install_result.stdout"
+  when: krew_check.rc != 0
+
+# install krew_plugins
+- name: Check if krew plugin is already installed
+  shell: "kubectl krew list | grep -w {{ item }}"
+  with_items: "{{ krew_plugins }}"
+  register: installed_plugins
+  changed_when: false
+  failed_when: installed_plugins.rc > 1
+  when: krew_plugins is defined
+  environment:
+    KREW_ROOT: "{{ user_home.stdout if user_home is defined else ansible_env.HOME }}/.krew"
+    PATH: "{{ user_home.stdout if user_home is defined else ansible_env.HOME }}/.krew/bin:{{ ansible_env.PATH }}"
+
+- name: Install krew plugins for Debian/Ubuntu
+  shell: "kubectl krew install {{ item }}"
+  with_items: "{{ krew_plugins }}"
+  when: 
+    - krew_plugins is defined
+    - "item not in installed_plugins.results|map(attribute='stdout')|list"
+    - ansible_os_family == 'Debian'
+  args:
+    executable: /bin/bash
+  environment:
+    KREW_ROOT: "{{ user_home.stdout if user_home is defined else ansible_env.HOME }}/.krew"
+    PATH: "{{ user_home.stdout if user_home is defined else ansible_env.HOME }}/.krew/bin:{{ ansible_env.PATH }}"
+  become: no
+  register: plugin_install_result
+  changed_when: "'Added plugin' in plugin_install_result.stdout"
+
+- name: Install krew plugins for RHEL/CentOS
+  shell: "kubectl krew install {{ item }}"
+  with_items: "{{ krew_plugins }}"
+  when: 
+    - krew_plugins is defined
+    - "item not in installed_plugins.results|map(attribute='stdout')|list"
+    - ansible_os_family == 'RedHat'
+  args:
+    executable: /bin/bash
+  environment:
+    KREW_ROOT: "{{ user_home.stdout if user_home is defined else ansible_env.HOME }}/.krew"
+    PATH: "{{ user_home.stdout if user_home is defined else ansible_env.HOME }}/.krew/bin:/usr/local/bin:{{ ansible_env.PATH }}"
+  become: no
+  register: plugin_install_result
+  changed_when: "'Added plugin' in plugin_install_result.stdout"
