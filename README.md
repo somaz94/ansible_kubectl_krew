@@ -1,12 +1,10 @@
 # Role Name
 
-
 ansible_kubectl_krew
 
 <br/>
 
 ## Requirements
-
 
 - Ansible 2.9 or higher
 - Targeted OS: Deiban/Ubuntu, RHEL/CentOS (For now)
@@ -14,7 +12,6 @@ ansible_kubectl_krew
 <br/>
 
 ## Role Variables
-
 
 The variables below can be modified in the `~/vars.yml` file as per your requirements:
 - `home_user`: User for which the tooling setup should be applied. 
@@ -24,7 +21,6 @@ The variables below can be modified in the `~/vars.yml` file as per your require
 <br/>
 
 ## Dependencies
-
 
 None.
 
@@ -120,11 +116,11 @@ ansible-playbook -i inventory.ini site.yml
 
 ## License
 
-
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Author Information
+<br/>
 
+## Author Information
 
 - somaz94
 - genius5711@gmail.com
