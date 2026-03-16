@@ -82,6 +82,8 @@
   register: krew_check
   failed_when: false
   changed_when: false
+  environment:
+    PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
 
 - name: Ensure git is installed RHEL/CentOS
   ansible.builtin.yum:
@@ -102,13 +104,14 @@
           KREW="krew-${OS}_${ARCH}"
           curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz"
           tar zxvf "${KREW}.tar.gz"
+          chmod +x ./"${KREW}"
           ./"${KREW}" install krew
         fi
       args:
         executable: /bin/bash
       environment:
         KREW_ROOT: "{{ user_home.stdout }}/.krew"
-        PATH: "{{ ansible_env.PATH }}:{{ user_home.stdout }}/.krew/bin"
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}:{{ user_home.stdout }}/.krew/bin"
       become: false
       register: krew_install_result
       changed_when: "'Added krew' in krew_install_result.stdout"
@@ -124,7 +127,7 @@
   when: krew_plugins is defined
   environment:
     KREW_ROOT: "{{ user_home.stdout | default(ansible_env.HOME) }}/.krew"
-    PATH: "{{ user_home.stdout | default(ansible_env.HOME) }}/.krew/bin:{{ ansible_env.PATH }}"
+    PATH: "{{ user_home.stdout | default(ansible_env.HOME) }}/.krew/bin:/usr/local/bin:{{ ansible_env.PATH }}"
 
 - name: Install krew plugins
   ansible.builtin.shell: "kubectl krew install {{ item }}"
