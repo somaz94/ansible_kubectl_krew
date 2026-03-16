@@ -3,9 +3,8 @@ galaxy_info:
   author: somaz
   description: Ansible role to install kubectl krew plugins
   license: MIT
-  min_ansible_version: 2.9
+  min_ansible_version: "2.9"
   role_name: ansible_kubectl_krew
-  namespace: somaz
   platforms:
     - name: Debian
       versions:
@@ -13,17 +12,16 @@ galaxy_info:
     - name: Ubuntu
       versions:
         - all
-    - name: RHEL
+    - name: EL
       versions:
         - all
-    - name: CentOS
+    - name: Fedora
       versions:
         - all
   galaxy_tags:
     - kubectl
     - krew
-    - krew_plugins
+    - krewplugins
+    - kubernetes
 
 dependencies: []
-
-

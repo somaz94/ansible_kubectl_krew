@@ -2,40 +2,32 @@
 - name: Converge
   hosts: all
   become: true
+  vars:
+    home_user: "somaz"
+    krew_plugins:
+      - "ctx"
+      - "neat"
+      - "ns"
 
   pre_tasks:
-    - name: Include group_vars
-      include_vars: ../../vars/main.yml
-
-    - name: Add user somaz
-      user:
-        name: "{{ home_user }}"
-        shell: /bin/bash
-        createhome: yes
-
-    - name: Update apt cache.
-      apt: 
-        update_cache: yes
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
       when: ansible_os_family == 'Debian'
 
-    - name: Update yum cache.
-      yum:
-        update_cache: yes
+    - name: Update yum cache
+      ansible.builtin.yum:
+        update_cache: true
       when: ansible_os_family == 'RedHat'
 
   roles:
     - role: ansible_kubectl_krew
 
   post_tasks:
-    - name: Notify about .bashrc reload
-      debug:
-        msg: ".bashrc will be reloaded on the next session."
-      changed_when: false
-
     - name: Set ownership for .krew directory
-      file:
+      ansible.builtin.file:
         path: "~{{ home_user }}/.krew"
         owner: "{{ home_user }}"
         group: "{{ home_user }}"
-        recurse: yes
+        recurse: true
         state: directory

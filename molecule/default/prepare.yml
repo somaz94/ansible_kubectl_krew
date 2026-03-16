@@ -1,0 +1,27 @@
+---
+- name: Prepare
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Fix PAM configuration for Docker containers (RedHat family)
+      ansible.builtin.raw: |
+        if [ -f /etc/pam.d/system-auth ]; then
+          cp /etc/pam.d/system-auth /etc/pam.d/system-auth.bak
+          cat > /etc/pam.d/system-auth <<PAM
+        auth sufficient pam_permit.so
+        account sufficient pam_permit.so
+        password sufficient pam_permit.so
+        session sufficient pam_permit.so
+        PAM
+        fi
+      changed_when: false
+
+    - name: Gather facts after PAM fix
+      ansible.builtin.setup:
+
+    - name: Create test user
+      ansible.builtin.user:
+        name: "{{ home_user | default('somaz') }}"
+        shell: /bin/bash
+        createhome: true
+        state: present
