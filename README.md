@@ -1,42 +1,55 @@
-# ansible_kubectl_krew
+# Ansible Kubectl Krew
 
+[![Ansible Galaxy](https://img.shields.io/badge/galaxy-somaz94.ansible__kubectl__krew-blue.svg)](https://galaxy.ansible.com/ui/standalone/roles/somaz94/ansible_kubectl_krew/)
 [![Molecule Test](https://github.com/somaz94/ansible_kubectl_krew/actions/workflows/molecule-test.yml/badge.svg)](https://github.com/somaz94/ansible_kubectl_krew/actions/workflows/molecule-test.yml)
 [![Release](https://github.com/somaz94/ansible_kubectl_krew/actions/workflows/release.yml/badge.svg)](https://github.com/somaz94/ansible_kubectl_krew/actions/workflows/release.yml)
-[![Ansible Galaxy](https://img.shields.io/badge/galaxy-somaz94.ansible__kubectl__krew-blue.svg)](https://galaxy.ansible.com/ui/standalone/roles/somaz94/ansible_kubectl_krew/)
+[![Galaxy Publish](https://github.com/somaz94/ansible_kubectl_krew/actions/workflows/galaxy-publish.yml/badge.svg)](https://github.com/somaz94/ansible_kubectl_krew/actions/workflows/galaxy-publish.yml)
+[![GitHub tag](https://img.shields.io/github/v/tag/somaz94/ansible_kubectl_krew)](https://github.com/somaz94/ansible_kubectl_krew/tags)
+[![License](https://img.shields.io/github/license/somaz94/ansible_kubectl_krew)](LICENSE)
 
-Ansible role to install kubectl and krew plugins.
+An Ansible role for installing kubectl and krew plugins on Unix/Linux systems.
 
 <br/>
 
 ## Requirements
 
-- Ansible 2.9 or higher
-- Targeted OS: Debian/Ubuntu, RHEL/CentOS
+- Ansible 2.9+
+- Supported OS: Ubuntu 22.04+, Debian 11+, Rocky Linux 9+, Fedora 40+
+
+<br/>
+
+## Installation
+
+```bash
+ansible-galaxy role install somaz94.ansible_kubectl_krew
+```
 
 <br/>
 
 ## Role Variables
 
-The variables below can be modified in the `vars/main.yml` file as per your requirements:
+<br/>
 
-- `home_user`: User for which the tooling setup should be applied.
-- `krew_version`: Desired version of krew. Default: `v0.4.4`
-- `krew_plugins`: List of krew plugins to be installed.
+### Defined in `defaults/main.yml`:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `home_user` | Target user for kubectl/krew setup | `somaz` |
+| `krew_version` | Krew version to install | `v0.4.4` |
+| `krew_plugins` | List of krew plugins to install | `[ctx, neat, ns]` |
 
 <br/>
 
-## Dependencies
-
-None.
+For a comprehensive list of available krew plugins, visit the official [krew plugins directory](https://krew.sigs.k8s.io/plugins/).
 
 <br/>
 
-## Example Playbook
+## Usage
 
-### Running Locally
+<br/>
 
-#### 1. Setting Up the Variable File
-Define the necessary variables in the `vars.yml` file:
+### Variables
+
 ```yaml
 # vars.yml
 home_user: "somaz"
@@ -47,25 +60,22 @@ krew_plugins:
   - "ns"
   # more...
 ```
-- For a comprehensive list of available krew plugins, visit the official [krew plugins directory](https://krew.sigs.k8s.io/plugins/).
 
-#### 2. Creating the Playbook
+<br/>
 
-Write the playbook in the `site.yml` file:
+### Playbook
+
 ```yaml
 # site.yml
 ---
 - hosts: localhost
-  become: yes
+  become: true
   vars_files:
-    - ~/vars.yml
+    - vars.yml
   roles:
     - somaz94.ansible_kubectl_krew
 ```
 
-#### 3. Running the Playbook
-
-Execute the playbook with the following command:
 ```bash
 ansible-playbook site.yml
 ```
@@ -74,63 +84,53 @@ ansible-playbook site.yml
 
 ### Running Remotely
 
-#### 1. Setting Up the Variable File
-
-Define the necessary variables in the `vars.yml` file:
-```yaml
-# vars.yml
-home_user: "somaz"
-krew_version: "v0.4.4"
-krew_plugins:
-  - "ctx"
-  - "neat"
-  - "ns"
-  # more...
-```
-
-#### 2. Setting Up the Inventory File
-Define the remote server information and connection details in the `inventory.ini` file:
 ```ini
 # inventory.ini
-[test_servers]
-test-server ansible_ssh_user=somaz ansible_ssh_private_key_file=~/.ssh/id_rsa
+[servers]
+my-server ansible_ssh_user=somaz ansible_ssh_private_key_file=~/.ssh/id_rsa
 ```
 
-#### 3. Creating the Playbook
-Write the playbook in the `site.yml` file:
 ```yaml
 # site.yml
 ---
-- hosts: test_servers
-  become: yes
+- hosts: servers
+  become: true
   vars_files:
-    - ~/vars.yml
+    - vars.yml
   roles:
     - somaz94.ansible_kubectl_krew
 ```
 
-#### 4. Running the Playbook
-Execute the playbook with the following command:
 ```bash
 ansible-playbook -i inventory.ini site.yml
 ```
 
 <br/>
 
-## Local Development
+## Development
+
+<br/>
+
+### Prerequisites
+
+- Python 3.x
+- Docker (for Molecule testing)
+
+<br/>
+
+### Quick Start
 
 ```bash
-# Create virtual environment and install dependencies
-make venv
-
-# Run full molecule test
-make test
-
-# Run with specific distro
-make test DISTRO=rockylinux9
-
-# Run ansible-lint
-make lint
+make venv                          # Create venv and install dependencies
+make test                          # Full molecule test (default: ubuntu2204)
+make test DISTRO=ubuntu2404        # Test with Ubuntu 24.04
+make test DISTRO=debian12          # Test with Debian 12
+make test DISTRO=rockylinux9       # Test with Rocky Linux 9
+make converge                      # Apply role only
+make verify                        # Run verification only
+make destroy                       # Destroy test instances
+make lint                          # Run ansible-lint
+make clean                         # Remove venv and build artifacts
 ```
 
 <br/>
@@ -138,11 +138,3 @@ make lint
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-<br/>
-
-## Author Information
-
-- somaz94
-- genius5711@gmail.com
-- https://github.com/somaz94

@@ -98,7 +98,8 @@
       ansible.builtin.shell: |
         set -e
         if ! kubectl krew version; then
-          cd "$(mktemp -d)"
+          INSTALL_DIR="$(mktemp -d -p "${HOME}")"
+          cd "${INSTALL_DIR}"
           OS="$(uname | tr '[:upper:]' '[:lower:]')"
           ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')"
           KREW="krew-${OS}_${ARCH}"
@@ -106,6 +107,8 @@
           tar zxvf "${KREW}.tar.gz"
           chmod +x ./"${KREW}"
           ./"${KREW}" install krew
+          cd /
+          rm -rf "${INSTALL_DIR}"
         fi
       args:
         executable: /bin/bash
