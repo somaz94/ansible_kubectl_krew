@@ -1,5 +1,9 @@
 # Changelog
 
+## [v1.1.1](https://github.com/somaz94/ansible_kubectl_krew/tree/v1.1.1) (2026-03-26)
+
+[Full Changelog](https://github.com/somaz94/ansible_kubectl_krew/compare/v1.1.0...v1.1.1)
+
 ## [v1.1.0](https://github.com/somaz94/ansible_kubectl_krew/tree/v1.1.0) (2026-03-16)
 
 [Full Changelog](https://github.com/somaz94/ansible_kubectl_krew/compare/1.0.0...v1.1.0)
