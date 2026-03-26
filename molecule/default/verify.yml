@@ -3,6 +3,10 @@
   hosts: all
   vars:
     home_user: "somaz"
+    krew_plugins:
+      - "ctx"
+      - "neat"
+      - "ns"
   tasks:
     - name: Check if kubectl is installed
       ansible.builtin.command: kubectl version --client
@@ -10,9 +14,27 @@
       failed_when: kubectl_result.rc != 0
       changed_when: false
 
+    - name: Get user home directory
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ home_user }}"
+
+    - name: Set user home directory fact
+      ansible.builtin.set_fact:
+        user_home_dir: "{{ ansible_facts.getent_passwd[home_user][4] }}"
+
     - name: Check if krew is installed
       ansible.builtin.command:
-        cmd: "/home/{{ home_user }}/.krew/bin/kubectl-krew version"
+        cmd: "{{ user_home_dir }}/.krew/bin/kubectl-krew version"
       register: krew_result
       failed_when: krew_result.rc != 0
       changed_when: false
+
+    - name: Check if krew plugins are installed
+      ansible.builtin.shell: "{{ user_home_dir }}/.krew/bin/kubectl-krew list | grep -w '{{ item }}'"
+      loop: "{{ krew_plugins }}"
+      register: plugin_check
+      failed_when: plugin_check.rc != 0
+      changed_when: false
+      environment:
+        KREW_ROOT: "{{ user_home_dir }}/.krew"

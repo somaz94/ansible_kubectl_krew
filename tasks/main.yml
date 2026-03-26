@@ -1,13 +1,17 @@
 ---
 # setup_bashrc
 - name: Get home directory of specific user
-  ansible.builtin.shell: "eval echo ~{{ home_user }}"
-  register: user_home
-  changed_when: false
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ home_user }}"
+
+- name: Set user home directory fact
+  ansible.builtin.set_fact:
+    user_home_dir: "{{ ansible_facts.getent_passwd[home_user][4] }}"
 
 - name: Update .bashrc for specific user
   ansible.builtin.blockinfile:
-    path: "{{ user_home.stdout }}/.bashrc"
+    path: "{{ user_home_dir }}/.bashrc"
     block: |
       # kubectl configurations
       source <(kubectl completion bash)
@@ -53,11 +57,18 @@
 
 - name: Install kubectl using binary
   block:
+    - name: Download kubectl checksum
+      ansible.builtin.command:
+        cmd: "curl -L -s https://dl.k8s.io/release/{{ latest_kubectl_version.stdout }}/bin/linux/amd64/kubectl.sha256"
+      register: kubectl_checksum
+      changed_when: false
+
     - name: Download kubectl binary
       ansible.builtin.get_url:
         url: "https://dl.k8s.io/release/{{ latest_kubectl_version.stdout }}/bin/linux/amd64/kubectl"
         dest: "/tmp/kubectl"
         mode: '0755'
+        checksum: "sha256:{{ kubectl_checksum.stdout }}"
         force: false
 
     - name: Install kubectl
@@ -96,25 +107,26 @@
   block:
     - name: Download and Install krew
       ansible.builtin.shell: |
-        set -e
-        if ! kubectl krew version; then
-          INSTALL_DIR="$(mktemp -d -p "${HOME}")"
-          cd "${INSTALL_DIR}"
-          OS="$(uname | tr '[:upper:]' '[:lower:]')"
-          ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')"
-          KREW="krew-${OS}_${ARCH}"
-          curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz"
-          tar zxvf "${KREW}.tar.gz"
-          chmod +x ./"${KREW}"
-          ./"${KREW}" install krew
-          cd /
-          rm -rf "${INSTALL_DIR}"
+        set -eo pipefail
+        if kubectl krew version >/dev/null 2>&1; then
+          echo "krew already installed"
+          exit 0
         fi
+        INSTALL_DIR="$(mktemp -d -p "${HOME}")"
+        trap 'rm -rf "${INSTALL_DIR}"' EXIT
+        cd "${INSTALL_DIR}"
+        OS="$(uname | tr '[:upper:]' '[:lower:]')"
+        ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')"
+        KREW="krew-${OS}_${ARCH}"
+        curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz"
+        tar zxvf "${KREW}.tar.gz"
+        chmod +x ./"${KREW}"
+        ./"${KREW}" install krew
       args:
         executable: /bin/bash
       environment:
-        KREW_ROOT: "{{ user_home.stdout }}/.krew"
-        PATH: "/usr/local/bin:{{ ansible_env.PATH }}:{{ user_home.stdout }}/.krew/bin"
+        KREW_ROOT: "{{ user_home_dir }}/.krew"
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}:{{ user_home_dir }}/.krew/bin"
       become: false
       register: krew_install_result
       changed_when: "'Added krew' in krew_install_result.stdout"
@@ -122,15 +134,15 @@
 
 # install krew_plugins
 - name: Check if krew plugin is already installed
-  ansible.builtin.shell: "kubectl krew list | grep -w {{ item }}"
+  ansible.builtin.shell: "kubectl krew list | grep -w '{{ item }}'"
   loop: "{{ krew_plugins }}"
   register: installed_plugins
   changed_when: false
   failed_when: installed_plugins.rc > 1
   when: krew_plugins is defined
   environment:
-    KREW_ROOT: "{{ user_home.stdout | default(ansible_env.HOME) }}/.krew"
-    PATH: "{{ user_home.stdout | default(ansible_env.HOME) }}/.krew/bin:/usr/local/bin:{{ ansible_env.PATH }}"
+    KREW_ROOT: "{{ user_home_dir | default(ansible_env.HOME) }}/.krew"
+    PATH: "{{ user_home_dir | default(ansible_env.HOME) }}/.krew/bin:/usr/local/bin:{{ ansible_env.PATH }}"
 
 - name: Install krew plugins
   ansible.builtin.shell: "kubectl krew install {{ item }}"
@@ -141,8 +153,8 @@
   args:
     executable: /bin/bash
   environment:
-    KREW_ROOT: "{{ user_home.stdout | default(ansible_env.HOME) }}/.krew"
-    PATH: "{{ user_home.stdout | default(ansible_env.HOME) }}/.krew/bin:/usr/local/bin:{{ ansible_env.PATH }}"
+    KREW_ROOT: "{{ user_home_dir | default(ansible_env.HOME) }}/.krew"
+    PATH: "{{ user_home_dir | default(ansible_env.HOME) }}/.krew/bin:/usr/local/bin:{{ ansible_env.PATH }}"
   become: false
   register: plugin_install_result
   changed_when: "'Added plugin' in plugin_install_result.stdout"
