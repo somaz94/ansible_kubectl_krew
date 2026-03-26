@@ -34,7 +34,7 @@ ansible-galaxy role install somaz94.ansible_kubectl_krew
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `home_user` | Target user for kubectl/krew setup | `somaz` |
+| `home_user` | Target user for kubectl/krew setup (required) | `""` |
 | `krew_plugins` | List of krew plugins to install | `[ctx, neat, ns]` |
 
 > **Note:** kubectl and krew are always installed as the latest version automatically.
@@ -53,7 +53,7 @@ For a comprehensive list of available krew plugins, visit the official [krew plu
 
 ```yaml
 # vars.yml
-home_user: "somaz"
+home_user: "your-username"
 krew_plugins:
   - "ctx"
   - "neat"
