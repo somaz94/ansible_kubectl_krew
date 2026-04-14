@@ -1,5 +1,13 @@
 # Changelog
 
+## [v1.1.1](https://github.com/somaz94/ansible_kubectl_krew/tree/v1.1.1) (2026-04-14)
+
+[Full Changelog](https://github.com/somaz94/ansible_kubectl_krew/compare/v1.1.1...v1.1.1)
+
+**Merged pull requests:**
+
+- chore\(deps\): bump softprops/action-gh-release from 2 to 3 [\#1](https://github.com/somaz94/ansible_kubectl_krew/pull/1) ([dependabot[bot]](https://github.com/apps/dependabot))
+
 ## [v1.1.1](https://github.com/somaz94/ansible_kubectl_krew/tree/v1.1.1) (2026-03-26)
 
 [Full Changelog](https://github.com/somaz94/ansible_kubectl_krew/compare/v1.1.0...v1.1.1)
