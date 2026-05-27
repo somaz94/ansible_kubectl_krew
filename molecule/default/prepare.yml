@@ -1,23 +1,26 @@
 ---
 - name: Prepare
   hosts: all
-  gather_facts: true
+  gather_facts: false
   tasks:
+    # Use `raw` so it works before PAM is repaired and without going
+    # through sudo (which itself needs PAM). The `[ -f ... ]` guard
+    # makes it a no-op on non-RHEL distros.
     - name: Fix PAM configuration for Docker containers (RedHat family)
-      ansible.builtin.copy:
-        dest: /etc/pam.d/system-auth
-        content: |
-          auth sufficient pam_permit.so
-          account sufficient pam_permit.so
-          password sufficient pam_permit.so
-          session sufficient pam_permit.so
-        owner: root
-        group: root
-        mode: '0644'
-        backup: true
-      when:
-        - ansible_os_family == 'RedHat'
-      become: true
+      ansible.builtin.raw: |
+        if [ -f /etc/pam.d/system-auth ]; then
+          cp /etc/pam.d/system-auth /etc/pam.d/system-auth.bak 2>/dev/null || true
+          cat > /etc/pam.d/system-auth <<'PAM'
+        auth sufficient pam_permit.so
+        account sufficient pam_permit.so
+        password sufficient pam_permit.so
+        session sufficient pam_permit.so
+        PAM
+        fi
+      changed_when: false
+
+    - name: Gather facts after PAM fix
+      ansible.builtin.setup:
 
     - name: Create test user
       ansible.builtin.user:
