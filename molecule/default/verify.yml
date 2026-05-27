@@ -8,11 +8,18 @@
       - "neat"
       - "ns"
   tasks:
-    - name: Check if kubectl is installed
+    - name: Check kubectl client version
       ansible.builtin.command: kubectl version --client
       register: kubectl_result
-      failed_when: kubectl_result.rc != 0
       changed_when: false
+
+    - name: Assert kubectl is properly installed
+      ansible.builtin.assert:
+        that:
+          - kubectl_result.rc == 0
+          - "'Client Version' in kubectl_result.stdout"
+        fail_msg: "kubectl is not properly installed"
+        quiet: true
 
     - name: Get user home directory
       ansible.builtin.getent:
@@ -23,18 +30,30 @@
       ansible.builtin.set_fact:
         user_home_dir: "{{ ansible_facts.getent_passwd[home_user][4] }}"
 
-    - name: Check if krew is installed
+    - name: Check krew binary version
       ansible.builtin.command:
         cmd: "{{ user_home_dir }}/.krew/bin/kubectl-krew version"
       register: krew_result
-      failed_when: krew_result.rc != 0
       changed_when: false
 
-    - name: Check if krew plugins are installed
-      ansible.builtin.shell: "{{ user_home_dir }}/.krew/bin/kubectl-krew list | grep -w '{{ item }}'"
-      loop: "{{ krew_plugins }}"
-      register: plugin_check
-      failed_when: plugin_check.rc != 0
+    - name: Assert krew is properly installed
+      ansible.builtin.assert:
+        that:
+          - krew_result.rc == 0
+        fail_msg: "krew is not properly installed"
+        quiet: true
+
+    - name: List installed krew plugins
+      ansible.builtin.command: "{{ user_home_dir }}/.krew/bin/kubectl-krew list"
+      register: krew_plugin_list
       changed_when: false
       environment:
         KREW_ROOT: "{{ user_home_dir }}/.krew"
+
+    - name: Assert each expected plugin is installed
+      ansible.builtin.assert:
+        that:
+          - item in (krew_plugin_list.stdout_lines | map('split') | map('first') | list)
+        fail_msg: "krew plugin '{{ item }}' is not installed"
+        quiet: true
+      loop: "{{ krew_plugins }}"

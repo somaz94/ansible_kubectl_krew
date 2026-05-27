@@ -13,14 +13,13 @@
     - name: Update apt cache
       ansible.builtin.apt:
         update_cache: true
+        cache_valid_time: 3600
       when: ansible_os_family == 'Debian'
-      changed_when: false
 
-    - name: Update yum cache
-      ansible.builtin.yum:
+    - name: Update dnf cache
+      ansible.builtin.dnf:
         update_cache: true
       when: ansible_os_family == 'RedHat'
-      changed_when: false
 
   roles:
     - role: ansible_kubectl_krew
