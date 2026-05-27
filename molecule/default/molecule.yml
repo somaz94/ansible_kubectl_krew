@@ -19,5 +19,9 @@ provisioner:
   name: ansible
   env:
     ANSIBLE_ROLES_PATH: "${MOLECULE_PROJECT_DIRECTORY}/.."
+    # Workaround: molecule-plugins/docker destroy.yml uses non-boolean
+    # lookup() in `when:` which ansible-core >=2.18 rejects. Remove once
+    # molecule-plugins ships a fix.
+    ANSIBLE_ALLOW_BROKEN_CONDITIONALS: "True"
 verifier:
   name: ansible
