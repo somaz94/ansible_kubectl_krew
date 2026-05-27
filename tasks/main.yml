@@ -1,4 +1,43 @@
 ---
+# Validate required variables
+- name: Validate required variables
+  ansible.builtin.assert:
+    that:
+      - home_user is defined
+      - home_user is string
+      - home_user | length > 0
+      - home_user is match('^[a-zA-Z0-9._-]+$')
+    fail_msg: "home_user must be set to a valid Linux username (got '{{ home_user | default('') }}')"
+    quiet: true
+
+# Install prerequisite packages (kept together for readability)
+- name: Add required tools (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name:
+      - gnupg
+      - software-properties-common
+      - wget
+      - curl
+      - git
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == 'Debian'
+  become: true
+
+- name: Add required tools (RHEL/Fedora)
+  ansible.builtin.dnf:
+    name:
+      # curl is intentionally omitted: RHEL/Rocky 9 ships curl-minimal
+      # which provides the curl binary and conflicts with the full curl
+      # package. curl-minimal supports the flags we need (-fsSLO).
+      - git
+      - tar
+      - gnupg2
+    state: present
+  when: ansible_os_family == 'RedHat'
+  become: true
+
 # setup_bashrc
 - name: Get home directory of specific user
   ansible.builtin.getent:
@@ -12,6 +51,7 @@
 - name: Update .bashrc for specific user
   ansible.builtin.blockinfile:
     path: "{{ user_home_dir }}/.bashrc"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK (kubectl_krew)"
     block: |
       # kubectl configurations
       source <(kubectl completion bash)
@@ -24,7 +64,7 @@
       fi
   become: false
   notify:
-    - reload bashrc
+    - Reload bashrc
 
 # install kubectl
 - name: Check if kubectl is installed
@@ -36,40 +76,40 @@
   ansible.builtin.set_fact:
     kubectl_installed: "{{ kubectl_stat.stat.exists }}"
 
-- name: Add required tools (Debian/Ubuntu)
-  ansible.builtin.apt:
-    name:
-      - gnupg
-      - software-properties-common
-      - wget
-      - curl
-      - git
-    state: present
-    update_cache: true
-  when: ansible_os_family == 'Debian'
-  become: true
+- name: Detect kubectl architecture
+  ansible.builtin.set_fact:
+    kubectl_arch: "{{ kubectl_arch_map[ansible_architecture] | default(ansible_architecture) }}"
+  vars:
+    kubectl_arch_map:
+      x86_64: amd64
+      amd64: amd64
+      aarch64: arm64
+      arm64: arm64
 
 - name: Retrieve the latest kubectl version
-  ansible.builtin.command:
-    cmd: "curl -L -s https://dl.k8s.io/release/stable.txt"
+  ansible.builtin.uri:
+    url: https://dl.k8s.io/release/stable.txt
+    return_content: true
   register: latest_kubectl_version
   changed_when: false
 
 - name: Install kubectl using binary
+  when: not kubectl_installed
   block:
     - name: Download kubectl checksum
-      ansible.builtin.command:
-        cmd: "curl -L -s https://dl.k8s.io/release/{{ latest_kubectl_version.stdout }}/bin/linux/amd64/kubectl.sha256"
+      ansible.builtin.uri:
+        url: "https://dl.k8s.io/release/{{ latest_kubectl_version.content | trim }}/bin/linux/{{ kubectl_arch }}/kubectl.sha256"
+        return_content: true
       register: kubectl_checksum
       changed_when: false
 
     - name: Download kubectl binary
       ansible.builtin.get_url:
-        url: "https://dl.k8s.io/release/{{ latest_kubectl_version.stdout }}/bin/linux/amd64/kubectl"
+        url: "https://dl.k8s.io/release/{{ latest_kubectl_version.content | trim }}/bin/linux/{{ kubectl_arch }}/kubectl"
         dest: "/tmp/kubectl"
         mode: '0755'
-        checksum: "sha256:{{ kubectl_checksum.stdout }}"
-        force: false
+        checksum: "sha256:{{ kubectl_checksum.content.split()[0] }}"
+        force: true
 
     - name: Install kubectl
       ansible.builtin.copy:
@@ -85,25 +125,18 @@
       ansible.builtin.file:
         path: "/tmp/kubectl"
         state: absent
-  when: not kubectl_installed
 
 # install krew
 - name: Check if krew is installed
-  ansible.builtin.shell: kubectl krew version
+  ansible.builtin.command: kubectl krew version
   register: krew_check
   failed_when: false
   changed_when: false
   environment:
     PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
 
-- name: Ensure git is installed RHEL/CentOS
-  ansible.builtin.yum:
-    name: git
-    state: present
-  become: true
-  when: ansible_os_family == 'RedHat'
-
 - name: Install krew
+  when: krew_check.rc != 0
   block:
     - name: Download and Install krew
       ansible.builtin.shell: |
@@ -130,31 +163,27 @@
       become: false
       register: krew_install_result
       changed_when: "'Added krew' in krew_install_result.stdout"
-  when: krew_check.rc != 0
 
 # install krew_plugins
-- name: Check if krew plugin is already installed
-  ansible.builtin.shell: "kubectl krew list | grep -w '{{ item }}'"
-  loop: "{{ krew_plugins }}"
+- name: Get installed krew plugins
+  ansible.builtin.command: kubectl krew list
   register: installed_plugins
   changed_when: false
-  failed_when: installed_plugins.rc > 1
   when: krew_plugins is defined
+  become: false
   environment:
-    KREW_ROOT: "{{ user_home_dir | default(ansible_env.HOME) }}/.krew"
-    PATH: "{{ user_home_dir | default(ansible_env.HOME) }}/.krew/bin:/usr/local/bin:{{ ansible_env.PATH }}"
+    KREW_ROOT: "{{ user_home_dir }}/.krew"
+    PATH: "{{ user_home_dir }}/.krew/bin:/usr/local/bin:{{ ansible_env.PATH }}"
 
 - name: Install krew plugins
-  ansible.builtin.shell: "kubectl krew install {{ item }}"
+  ansible.builtin.command: "kubectl krew install {{ item }}"
   loop: "{{ krew_plugins }}"
   when:
     - krew_plugins is defined
-    - item not in installed_plugins.results | map(attribute='stdout') | list
-  args:
-    executable: /bin/bash
+    - item not in (installed_plugins.stdout_lines | default([]) | map('split') | map('first') | list)
   environment:
-    KREW_ROOT: "{{ user_home_dir | default(ansible_env.HOME) }}/.krew"
-    PATH: "{{ user_home_dir | default(ansible_env.HOME) }}/.krew/bin:/usr/local/bin:{{ ansible_env.PATH }}"
+    KREW_ROOT: "{{ user_home_dir }}/.krew"
+    PATH: "{{ user_home_dir }}/.krew/bin:/usr/local/bin:{{ ansible_env.PATH }}"
   become: false
   register: plugin_install_result
-  changed_when: "'Added plugin' in plugin_install_result.stdout"
+  changed_when: "'Installed plugin' in plugin_install_result.stdout"
