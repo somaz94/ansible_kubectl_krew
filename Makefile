@@ -3,10 +3,11 @@
 VENV := .venv
 DISTRO ?= ubuntu2204
 
-$(VENV)/bin/activate: requirements.txt
+$(VENV)/bin/activate: requirements.txt molecule/default/requirements.yml
 	python3 -m venv $(VENV)
 	$(VENV)/bin/pip install --upgrade pip
 	$(VENV)/bin/pip install -r requirements.txt
+	$(VENV)/bin/ansible-galaxy collection install -r molecule/default/requirements.yml
 	@touch $(VENV)/bin/activate
 
 venv: $(VENV)/bin/activate ## Create virtual environment and install dependencies
@@ -30,7 +31,7 @@ destroy: venv ## Destroy molecule test instances
 	MOLECULE_DISTRO=$(DISTRO) $(VENV)/bin/molecule destroy
 
 lint: venv ## Run ansible-lint
-	$(VENV)/bin/ansible-lint
+	ANSIBLE_ROLES_PATH=$(realpath ..) $(VENV)/bin/ansible-lint
 
 clean: ## Remove build artifacts and virtual environment
 	rm -rf $(VENV) .cache .molecule
