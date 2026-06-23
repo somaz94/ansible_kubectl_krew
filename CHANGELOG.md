@@ -1,5 +1,13 @@
 # Changelog
 
+## [v1.2.0](https://github.com/somaz94/ansible_kubectl_krew/tree/v1.2.0) (2026-06-23)
+
+[Full Changelog](https://github.com/somaz94/ansible_kubectl_krew/compare/v1.2.0...v1.2.0)
+
+**Merged pull requests:**
+
+- chore\(deps\): bump actions/checkout from 6 to 7 [\#4](https://github.com/somaz94/ansible_kubectl_krew/pull/4) ([dependabot[bot]](https://github.com/apps/dependabot))
+
 ## [v1.2.0](https://github.com/somaz94/ansible_kubectl_krew/tree/v1.2.0) (2026-05-27)
 
 [Full Changelog](https://github.com/somaz94/ansible_kubectl_krew/compare/v1.1.1...v1.2.0)
